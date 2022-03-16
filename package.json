@@ -1,0 +1,30 @@
+{
+  "name": "crypto-alerts",
+  "version": "1.0.0",
+  "description": "Progressive Web Application to get custom alerts based on cryptocurrency quotations",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guillaumeprevot/crypto-alerts.git"
+  },
+  "keywords": [
+    "node",
+    "express",
+    "pwa",
+    "currencies",
+    "crypto",
+    "bitcoin"
+  ],
+  "author": "https://github.com/guillaumeprevot",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/guillaumeprevot/crypto-alerts/issues"
+  },
+  "homepage": "https://github.com/guillaumeprevot/crypto-alerts#readme",
+  "dependencies": {
+    "express": "^4.17.3"
+  }
+}
