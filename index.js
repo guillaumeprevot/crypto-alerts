@@ -24,8 +24,11 @@ const log = {
 // Starting
 log.info(`${name} is starting...`)
 
-// Hello world
-app.get('/', (_req, res) => res.send('Hello World!'));
+// Serve static files from "webapp" folder
+app.use(express.static('webapp'))
+
+// Redirect / to the main page
+app.get('/', (_req, res) => res.redirect('/index.html'));
 
 // Create HTTP or HTTPS server, instead of app.listen
 // app.listen(config.port, () => { ... })
