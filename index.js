@@ -4,6 +4,7 @@ const https = require('https')
 const express = require('express')
 const app = express()
 const name = 'Crypto!'
+const cmc = require('./coinmarketcap');
 
 // This is the application configuration based on environment variables
 const config = {
@@ -11,6 +12,7 @@ const config = {
 	port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
 	key: process.env.HTTPS_KEY || '', // /path/to/privkey.pem
 	cert: process.env.HTTPS_CERT || '', // /path/to/cert.pem
+	cmcAPIKey: process.env.CMC_API_KEY || '', // API key for CoinMarketCap https://coinmarketcap.com/api/features
 }
 
 // This is a *very* simple log interface
@@ -20,6 +22,7 @@ const log = {
 	info: (text) => console.log(text),
 	trace: (text) => config.dev && console.log(text),
 }
+cmc.onerror = log.error;
 
 // Starting
 log.info(`${name} is starting...`)
@@ -29,6 +32,12 @@ app.use(express.static('webapp'))
 
 // Redirect / to the main page
 app.get('/', (_req, res) => res.redirect('/index.html'));
+
+// Temporary routes to test CoinMarketCap access
+app.get('/cmc/map', (req, res) => cmc.map(config.cmcAPIKey).then((data) => res.json(data)))
+app.get('/cmc/info', (req, res) => cmc.info(config.cmcAPIKey, 'BTC,ETH,USDT').then((data) => res.json(data)))
+app.get('/cmc/listing', (req, res) => cmc.listing(config.cmcAPIKey, 'USD').then((data) => res.json(data)))
+app.get('/cmc/quotation', (req, res) => cmc.quotation(config.cmcAPIKey, 'BTC,ETH,USDT', 'USD').then((data) => res.json(data)))
 
 // Create HTTP or HTTPS server, instead of app.listen
 // app.listen(config.port, () => { ... })
