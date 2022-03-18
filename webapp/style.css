@@ -12,3 +12,8 @@ body {
 .install-button {
 	display: none;
 }
+
+.vibrate {
+	display: none;
+}
+

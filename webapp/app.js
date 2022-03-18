@@ -35,3 +35,21 @@ window.addEventListener('beforeinstallprompt', (e) => {
 window.addEventListener('appinstalled', (e) => {
 	console.log('Application installed');
 });
+
+if (! window.navigator.vibrate) {
+	alert('Vibration API is not supported');
+} else {
+	document.querySelectorAll('.vibrate').forEach((e) => e.style.display = 'inline')
+
+	document.querySelector('.vibrate-single').addEventListener('click', (e) => {
+		window.navigator.vibrate(3000);
+	})
+
+	document.querySelector('.vibrate-pattern').addEventListener('click', (e) => {
+		window.navigator.vibrate([1000, 100, 1000, 100, 1000]);
+	})
+
+	document.querySelector('.vibrate-off').addEventListener('click', (e) => {
+		window.navigator.vibrate(0);
+	})
+}
