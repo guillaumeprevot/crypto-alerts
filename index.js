@@ -34,10 +34,12 @@ app.use(express.static('webapp'))
 app.get('/', (_req, res) => res.redirect('/index.html'));
 
 // Temporary routes to test CoinMarketCap access
-app.get('/cmc/map', (req, res) => cmc.map(config.cmcAPIKey).then((data) => res.json(data)))
-app.get('/cmc/info', (req, res) => cmc.info(config.cmcAPIKey, 'BTC,ETH,USDT').then((data) => res.json(data)))
-app.get('/cmc/listing', (req, res) => cmc.listing(config.cmcAPIKey, 'USD').then((data) => res.json(data)))
-app.get('/cmc/quotation', (req, res) => cmc.quotation(config.cmcAPIKey, 'BTC,ETH,USDT', 'USD').then((data) => res.json(data)))
+if (config.dev) {
+	app.get('/cmc/map', (req, res) => cmc.map(config.cmcAPIKey).then((data) => res.json(data)))
+	app.get('/cmc/info', (req, res) => cmc.info(config.cmcAPIKey, 'BTC,ETH,USDT').then((data) => res.json(data)))
+	app.get('/cmc/listing', (req, res) => cmc.listing(config.cmcAPIKey, 'USD').then((data) => res.json(data)))
+	app.get('/cmc/quotation', (req, res) => cmc.quotation(config.cmcAPIKey, 'BTC,ETH,USDT', 'USD').then((data) => res.json(data)))
+}
 
 // Create HTTP or HTTPS server, instead of app.listen
 // app.listen(config.port, () => { ... })
