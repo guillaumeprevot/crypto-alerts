@@ -53,3 +53,58 @@ if (! window.navigator.vibrate) {
 		window.navigator.vibrate(0);
 	})
 }
+
+// Notifications
+const notifyPermission = document.querySelector('.notify-permission');
+const notifyClient = document.querySelector('.notify-client');
+const notifySW = document.querySelector('.notify-sw');
+const notifyClicked = document.querySelector('.notify-clicked');
+notifyClicked.style.display = 'none';
+if (Notification.permission === 'granted') {
+	notifyPermission.style.display = 'none';
+} else {
+	notifyClient.style.display = 'none';
+	notifySW.style.display = 'none';
+}
+notifyPermission.addEventListener('click', (e) => {
+	Notification.requestPermission(function(result) {
+		if (result === 'granted') {
+			notifyClient.style.display = '';
+			notifySW.style.display = '';
+			notifyPermission.style.display = 'none';
+		}
+	});
+})
+notifyClient.addEventListener('click', (e) => {
+	Notification.requestPermission(function(result) {
+		if (result === 'granted') {
+			navigator.serviceWorker.ready.then(function(registration) {
+				registration.showNotification('Notify from HTML', {
+					body: 'Buzz! Buzz!',
+					icon: '/icons/icon-192.png',
+					vibrate: [200, 100, 200, 100, 200, 100, 200],
+					tag: 'vibration-sample'
+				});
+			});
+		}
+	});
+})
+notifySW.addEventListener('click', (e) => {
+	Notification.requestPermission(function(result) {
+		if (result === 'granted') {
+			navigator.serviceWorker.ready.then(function(registration) {
+				registration.active.postMessage('notify');
+			});
+		}
+	});
+})
+if ('serviceWorker' in navigator) {
+	navigator.serviceWorker.addEventListener('message', (e) => {
+		if (e.data === 'notificationclick') {
+			notifyClicked.style.display = '';
+			setTimeout(() => {
+				notifyClicked.style.display = 'none';
+			}, 3000);
+		}
+	})
+}

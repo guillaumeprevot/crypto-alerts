@@ -1,4 +1,4 @@
-const version = 1;
+const version = 2;
 const cacheName = 'crypto-alerts-' + version;
 const cacheContent = [
 	'/',
@@ -46,4 +46,21 @@ self.addEventListener('fetch', (e) => {
 	e.respondWith(caches.match(e.request)
 		.then((response) => response || fetch(e.request))
 	);
+});
+
+self.addEventListener('message', (e) => {
+	if (e.data === 'notify') {
+		self.registration.showNotification('Notify from SW', {
+			body: 'Buzz! Buzz!',
+			icon: '/icons/icon-192.png',
+			vibrate: [200, 100, 200, 100, 200, 100, 200],
+			tag: 'vibration-sample'
+		});
+	}
+});
+
+self.addEventListener('notificationclick', (e) => {
+	self.clients.matchAll().then(function(clients) {
+		clients.forEach((c) => c.postMessage('notificationclick'));
+	});
 });
