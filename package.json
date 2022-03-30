@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/guillaumeprevot/crypto-alerts#readme",
   "dependencies": {
-    "express": "^4.17.3"
+    "express": "^4.17.3",
+    "web-push": "^3.4.5"
   }
 }

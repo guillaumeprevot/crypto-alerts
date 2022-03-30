@@ -108,3 +108,86 @@ if ('serviceWorker' in navigator) {
 		}
 	})
 }
+
+// Push notifications
+if (navigator.serviceWorker) {
+	let pushRegisterButton = document.getElementById('push-register');
+	let pushUnregisterButton = document.getElementById('push-unregister');
+	let pushTestButton = document.getElementById('push-test');
+
+	function setRegistered() {
+		pushRegisterButton.style.display = 'none';
+		pushUnregisterButton.style.display = '';
+	}
+
+	function setUnregistered() {
+		pushRegisterButton.style.display = '';
+		pushUnregisterButton.style.display = 'none';
+	}
+
+	// This function is needed because Chrome doesn't accept a base64 encoded string
+	// as value for applicationServerKey in pushManager.subscribe yet
+	// https://bugs.chromium.org/p/chromium/issues/detail?id=802280
+	function urlBase64ToUint8Array(base64String) {
+		var padding = '='.repeat((4 - base64String.length % 4) % 4);
+		var base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+		var rawData = window.atob(base64);
+		var outputArray = new Uint8Array(rawData.length);
+		for (var i = 0; i < rawData.length; ++i) {
+			outputArray[i] = rawData.charCodeAt(i);
+		}
+		return outputArray;
+	}
+
+	navigator.serviceWorker.ready
+		.then((registration) => registration.pushManager.getSubscription())
+		.then((subscription) => subscription ? setRegistered() : setUnregistered());
+
+	pushRegisterButton.addEventListener('click', (e) => {
+		navigator.serviceWorker.ready.then(async function(registration) {
+			// Get the server's public key
+			const response = await fetch('/subscription/key');
+			const vapidPublicKey = await response.text();
+			const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+			// Subscribe the user
+			return registration.pushManager.subscribe({
+				userVisibleOnly: true,
+				applicationServerKey: convertedVapidKey
+			});
+		}).then(function(subscription) {
+			console.log('Subscribed', subscription.endpoint);
+			return fetch('/subscription/register', {
+				method: 'post',
+				headers: {
+					'Content-type': 'application/json'
+				},
+				body: JSON.stringify({
+					subscription: subscription
+				})
+			});
+		}).then(setRegistered);
+	});
+
+	pushUnregisterButton.addEventListener('click', (e) => {
+		navigator.serviceWorker.ready.then(function(registration) {
+			return registration.pushManager.getSubscription();
+		}).then(function(subscription) {
+			return subscription.unsubscribe().then(function() {
+				console.log('Unsubscribed', subscription.endpoint);
+				return fetch('/subscription/unregister', {
+					method: 'post',
+					headers: {
+						'Content-type': 'application/json'
+					},
+					body: JSON.stringify({
+						subscription: subscription
+					})
+				});
+			});
+		}).then(setUnregistered);
+	});
+
+	pushTestButton.addEventListener('click', (e) => {
+		fetch('/subscription/test');
+	});
+}
