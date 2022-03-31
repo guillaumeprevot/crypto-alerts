@@ -1,4 +1,4 @@
-const version = 3;
+const version = 4;
 const cacheName = 'crypto-alerts-' + version;
 const cacheContent = [
 	'/',
@@ -65,19 +65,35 @@ self.addEventListener('notificationclick', (e) => {
 	});
 });
 
-// Listen to `push` notification event. Define the text to be displayed
-// and show the notification.
+//======= PUSH NOTIFICATIONS =======
+
 self.addEventListener('push', function(event) {
 	let payload = event.data.json();
-	event.waitUntil(self.registration.showNotification(payload.title, {
-		body: payload.message
-	}));
+	event.waitUntil(notifyUntilClicked(payload.title, payload.message));
 });
 
-// Listen to  `pushsubscriptionchange` event which is fired when
-// subscription expires. Subscribe again and register the new subscription
-// in the server by sending a POST request with endpoint. Real world
-// application would probably use also user identification.
+let notifyTimeout = null;
+
+function notifyUntilClicked(title, message) {
+	return self.registration.showNotification(title, {
+		body: message,
+		icon: '/icons/icon-192.png',
+		vibrate: [600, 200, 600],
+		requireInteraction: true,
+		renotify: true,
+		tag: 'crypto-vibration'
+	}).then(() => {
+		notifyTimeout = setTimeout(() => notifyUntilClicked(title, message), 3000);
+	});
+}
+
+self.addEventListener('notificationclick', (e) => {
+	if (notifyTimeout !== null) {
+		clearTimeout(notifyTimeout);
+		notifyTimeout = null;
+	}
+});
+
 self.addEventListener('pushsubscriptionchange', function(event) {
 	console.log('Subscription expired');
 	event.waitUntil(
