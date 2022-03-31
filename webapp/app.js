@@ -125,20 +125,6 @@ if (navigator.serviceWorker) {
 		pushUnregisterButton.style.display = 'none';
 	}
 
-	// This function is needed because Chrome doesn't accept a base64 encoded string
-	// as value for applicationServerKey in pushManager.subscribe yet
-	// https://bugs.chromium.org/p/chromium/issues/detail?id=802280
-	function urlBase64ToUint8Array(base64String) {
-		var padding = '='.repeat((4 - base64String.length % 4) % 4);
-		var base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-		var rawData = window.atob(base64);
-		var outputArray = new Uint8Array(rawData.length);
-		for (var i = 0; i < rawData.length; ++i) {
-			outputArray[i] = rawData.charCodeAt(i);
-		}
-		return outputArray;
-	}
-
 	navigator.serviceWorker.ready
 		.then((registration) => registration.pushManager.getSubscription())
 		.then((subscription) => subscription ? setRegistered() : setUnregistered());
@@ -148,11 +134,10 @@ if (navigator.serviceWorker) {
 			// Get the server's public key
 			const response = await fetch('/subscription/key');
 			const vapidPublicKey = await response.text();
-			const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
 			// Subscribe the user
 			return registration.pushManager.subscribe({
 				userVisibleOnly: true,
-				applicationServerKey: convertedVapidKey
+				applicationServerKey: vapidPublicKey
 			});
 		}).then(function(subscription) {
 			console.log('Subscribed', subscription.endpoint);
