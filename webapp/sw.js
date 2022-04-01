@@ -1,4 +1,4 @@
-const version = 4;
+const version = 5;
 const cacheName = 'crypto-alerts-' + version;
 const cacheContent = [
 	'/',
@@ -22,7 +22,7 @@ self.addEventListener('install', (e) => {
 	self.skipWaiting();
 	e.waitUntil(caches.open(cacheName)
 		.then((cache) => cache.addAll(cacheContent))
-		.then(() => { info(`new cache ${cacheName} created`); })
+		.then(() => info(`created cache ${cacheName}`))
 	);
 });
 
@@ -30,18 +30,18 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
 	info('activated');
 	e.waitUntil(caches.keys()
-		.then((keys) => Promise.all(keys.map(function(key) {
-			if (key !== cacheName) {
-				info(`old cache ${key} deleted`);
-				return caches.delete(key);
-			}
-		})))
+		.then((keys) => keys.filter((key) => key !== cacheName))
+		.then((keys) => keys.map((key) => caches.delete(key)))
+		.then((promises) => Promise.all(promises))
+		.then(() => info('deleted old caches'))
 		.then(() => clients.claim())
 	);
 });
 
 /* Serve cached content when available */
 self.addEventListener('fetch', (e) => {
+	// TODO use 'network-or-cache' strategy instead ?
+	// https://github.com/mdn/serviceworker-cookbook/blob/master/strategy-network-or-cache/service-worker.js
 	trace('fetching ' + e.request.url);
 	e.respondWith(caches.match(e.request)
 		.then((response) => response || fetch(e.request))
@@ -69,7 +69,19 @@ self.addEventListener('notificationclick', (e) => {
 
 self.addEventListener('push', function(event) {
 	let payload = event.data.json();
-	event.waitUntil(notifyUntilClicked(payload.title, payload.message));
+	let title = payload.title;
+	let symbol = payload.activation.symbol;
+	let price = payload.activation.price;
+	let time = new Date(payload.activation.activation).toLocaleTimeString();
+	let message = `${symbol} à ${price} USDT depuis ${time}`;
+	event.waitUntil(notifyUntilClicked(title, message).then(() => {
+		return self.clients.matchAll().then(function(clients) {
+			clients.forEach((c) => c.postMessage({
+				type: 'push',
+				activation: payload.activation
+			}));
+		});
+	}));
 });
 
 let notifyTimeout = null;
@@ -95,18 +107,18 @@ self.addEventListener('notificationclick', (e) => {
 });
 
 self.addEventListener('pushsubscriptionchange', function(event) {
-	console.log('Subscription expired');
+	info('subscription expired');
 	event.waitUntil(
 		self.registration.pushManager.subscribe({ userVisibleOnly: true })
 		.then(function(subscription) {
-			console.log('Subscribed after expiration', subscription.endpoint);
-			return fetch('register', {
+			info('subscription renewed');
+			return fetch('/subscription/register', {
 				method: 'post',
 				headers: {
 					'Content-type': 'application/json'
 				},
 				body: JSON.stringify({
-					endpoint: subscription.endpoint
+					subscription: subscription
 				})
 			});
 		})

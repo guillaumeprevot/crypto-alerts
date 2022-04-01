@@ -47,7 +47,7 @@ class TestSource {
 	}
 
 	list() {
-		let result = data.filter((d) => d.symbol !== this.quotationSymbol).map((d) => {
+		let result = this.data.filter((d) => d.symbol !== this.quotationSymbol).map((d) => {
 			return {
 				symbol: d.symbol,
 				name: d.name,
@@ -60,7 +60,7 @@ class TestSource {
 
 	quote(symbols) {
 		let result = new Map();
-		data.filter((d) => symbols.includes(d.symbol)).forEach((d) => {
+		this.data.filter((d) => symbols.includes(d.symbol)).forEach((d) => {
 			let randomPrice = d.minQuote + Math.random() * d.variableQuote;
 			result.set(d.symbol, randomPrice);
 		});

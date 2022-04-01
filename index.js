@@ -20,10 +20,11 @@ const config = {
 
 // This is a *very* simple log interface
 const log = {
-	error: (text) => console.error(text),
-	warn: (text) => console.log(text),
-	info: (text) => console.log(text),
-	trace: (text) => config.dev && console.log(text),
+	prefix: () => config.dev ? '> ' : (new Date().toISOString() + ' | '),
+	error: (text) => console.error(log.prefix() + text),
+	warn: (text) => console.log(log.prefix() + text),
+	info: (text) => console.log(log.prefix() + text),
+	trace: (text) => config.dev && console.log(log.prefix() + text),
 }
 
 if (!config.dev && (!config.httpsKey || !config.httpsCert)) {
@@ -76,39 +77,6 @@ app.get('/subscription/key', (req, res) => {
 	res.send(process.env.VAPID_PUBLIC_KEY);
 })
 
-model.quoteEntries((activations) => {
-	if (activations.length === 0) {
-		log.trace('No alert for now');
-		return;
-	}
-	let payload = JSON.stringify({ title: name, activations: activations });
-	Object.values(subscriptions).forEach((subscription) => {
-		webpush.sendNotification(subscription, payload)
-			.then(function() {
-				activations.forEach((a) => log.info('Push notification for ' + a.symbol + ' quoting ' + a.price + ' at ' + new Date(a.activation) + ' sent to ' + subscription.endpoint));
-			})
-			.catch(function() {
-				activations.forEach((a) => log.error('ERROR in sending push notification for ' + a.symbol + ' quoting ' + a.price + ' at ' + new Date(a.activation) + ' to ' + subscription.endpoint));
-				delete subscriptions[subscription.endpoint];
-			});
-	});
-});
-
-app.get('/subscription/test', (req, res) => {
-	let payload = JSON.stringify({ title: name, message: 'Hello World!' });
-	Object.values(subscriptions).forEach((subscription) => {
-		webpush.sendNotification(subscription, payload)
-			.then(function() {
-				log.info('Test push notification sent to ' + subscription.endpoint);
-			})
-			.catch(function() {
-				log.error('ERROR in sending test push notification to old endpoint ' + subscription.endpoint);
-				delete subscriptions[subscription.endpoint];
-			});
-	});
-	res.send("");
-})
-
 app.post('/subscription/register', (req, res) => {
 	var subscription = req.body.subscription;
 	if (!subscriptions[subscription.endpoint]) {
@@ -125,7 +93,27 @@ app.post('/subscription/unregister', (req, res) => {
 		delete subscriptions[subscription.endpoint];
 	}
 	res.sendStatus(201);
-});
+})
+
+app.get('/subscription/test', (req, res) => {
+	model.addAlert({ symbol: 'BTC', operator: 'higher', threshold: 43000 });
+	res.send("");
+})
+
+model.listEntries().then(() => model.quoteEntries((activation) => {
+	let payload = JSON.stringify({ title: name, activation: activation });
+	log.info('Push notification for ' + activation.symbol + ' at ' + activation.price);
+	Object.values(subscriptions).forEach((subscription) => {
+		webpush.sendNotification(subscription, payload)
+			.then(function() {
+				log.trace('Push notification sent to ' + subscription.endpoint);
+			})
+			.catch(function() {
+				log.error('ERROR in sending push notification to ' + subscription.endpoint);
+				delete subscriptions[subscription.endpoint];
+			});
+	});
+}))
 
 // Create HTTP or HTTPS server, instead of app.listen
 // app.listen(config.port, () => { ... })
@@ -146,6 +134,7 @@ server.listen(config.port, () => {
 process.on('SIGTERM', () => {
 	log.info(`${name} is stopping (SIGTERM)...`)
 	server.close(() => {
+		try { clearTimeout(model.quoteTimeout); } catch (error) { console.log(error); }
 		log.info(`${name} has stopped.`)
 	})
 })

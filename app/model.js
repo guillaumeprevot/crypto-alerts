@@ -52,6 +52,7 @@ class CryptoModel {
 		this.entries = [];
 		this.alerts = [];
 		this.nextListCallTimestamp = 0;
+		this.quoteTimeout = null;
 	}
 
 	listEntries() {
@@ -69,12 +70,12 @@ class CryptoModel {
 	quoteEntries(onactivation) {
 		if (this.alerts.length === 0) {
 			// Quoting is unnecessary, try again later
-			setTimeout(() => this.quoteEntries(onactivation), this.source.quoteInterval);
+			this.quoteTimeout = setTimeout(() => this.quoteEntries(onactivation), this.source.quoteInterval);
 			return;
 		}
 		// get the symbols from configured alerts
-		let symbols = new Set();
-		this.alerts.forEach((a) => symbols.add(a.symbol));
+		let symbols = [];
+		this.alerts.forEach((a) => symbols.includes(a.symbol) || symbols.push(a.symbol));
 		// update quotes
 		this.source.quote(symbols).then((quoteMap) => {
 			// create the map of updated entries by symbol
@@ -88,7 +89,6 @@ class CryptoModel {
 				}
 			});
 			// check for alert activation
-			let activations = [];
 			let now = Date.now();
 			this.alerts.forEach((alert) => {
 				// console.log('checking', alert);
@@ -104,7 +104,8 @@ class CryptoModel {
 				let activated = operator(entry.previousQuote, entry.currentQuote, alert.threshold);
 				if (activated) {
 					alert.activation = now;
-					activations.push({
+					// Send alerts
+					onactivation({
 						uuid: alert.uuid,
 						activation: alert.activation,
 						name: entry.name,
@@ -115,11 +116,8 @@ class CryptoModel {
 					});
 				}
 			});
-			// console.log('activations', activations);
-			if (activations.length > 0)
-				onactivation(activations);
 			// Wait before the next quoting
-			setTimeout(() => this.quoteEntries(onactivation), this.source.quoteInterval);
+			this.quoteTimeout = setTimeout(() => this.quoteEntries(onactivation), this.source.quoteInterval);
 		});
 	}
 

@@ -2,7 +2,7 @@
 if ('serviceWorker' in navigator) {
 	navigator.serviceWorker
 		.register('/sw.js')
-		.then(() => { console.log('Service Worker Registered'); });
+		.then(() => console.log('Service Worker registered'));
 }
 
 // Code to handle install prompt on desktop
@@ -33,7 +33,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 window.addEventListener('appinstalled', (e) => {
-	console.log('Application installed');
+	console.log('PWA installation completed');
 });
 
 if (! window.navigator.vibrate) {
@@ -105,6 +105,10 @@ if ('serviceWorker' in navigator) {
 			setTimeout(() => {
 				notifyClicked.style.display = 'none';
 			}, 3000);
+		} else if (e.data && e.data.type === 'push') {
+			let ul = document.getElementById('push-alerts');
+			let a = e.data.activation;
+			ul.innerHTML += '<li>' + a.symbol + ' = ' + a.price + '</li>'
 		}
 	})
 }
@@ -140,7 +144,7 @@ if (navigator.serviceWorker) {
 				applicationServerKey: vapidPublicKey
 			});
 		}).then(function(subscription) {
-			console.log('Subscribed', subscription.endpoint);
+			console.log('Subscribed to push notifications');
 			return fetch('/subscription/register', {
 				method: 'post',
 				headers: {
@@ -158,7 +162,7 @@ if (navigator.serviceWorker) {
 			return registration.pushManager.getSubscription();
 		}).then(function(subscription) {
 			return subscription.unsubscribe().then(function() {
-				console.log('Unsubscribed', subscription.endpoint);
+				console.log('Unsubscribed from push notifications');
 				return fetch('/subscription/unregister', {
 					method: 'post',
 					headers: {
@@ -173,6 +177,8 @@ if (navigator.serviceWorker) {
 	});
 
 	pushTestButton.addEventListener('click', (e) => {
-		fetch('/subscription/test');
+		fetch('/subscription/test').then(() => {
+			pushTestButton.style.display = 'none';
+		});
 	});
 }
