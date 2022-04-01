@@ -3,10 +3,9 @@ const http = require('http')
 const https = require('https')
 const express = require('express')
 const webpush = require('web-push')
-const cmc = require('./coinmarketcap')
-const app = express()
-const name = 'Crypto!'
-const webpushSubscriptions = {}
+//const CryptoSource = require('./app/source-cmc')
+const CryptoSource = require('./app/source-test')
+const CryptoModel = require('./app/model')
 
 // This is the application configuration based on environment variables
 const config = {
@@ -54,7 +53,11 @@ if (!config.vapidPublicKey || !config.vapidPrivateKey) {
 	);
 }
 
-cmc.onerror = log.error;
+const app = express()
+const name = 'Crypto!'
+const subscriptions = {}
+const source = new CryptoSource(config.cmcAPIKey, 'USDT', log.error);
+const model = new CryptoModel(source);
 
 // Starting
 log.info(`${name} is starting...`)
@@ -73,16 +76,34 @@ app.get('/subscription/key', (req, res) => {
 	res.send(process.env.VAPID_PUBLIC_KEY);
 })
 
-app.get('/subscription/test', (req, res) => {
-	let payload = JSON.stringify({ title: name, message: 'Hello World!' });
-	Object.values(webpushSubscriptions).forEach((subscription) => {
+model.quoteEntries((activations) => {
+	if (activations.length === 0) {
+		log.trace('No alert for now');
+		return;
+	}
+	let payload = JSON.stringify({ title: name, activations: activations });
+	Object.values(subscriptions).forEach((subscription) => {
 		webpush.sendNotification(subscription, payload)
 			.then(function() {
-				console.log('Push Application Server - Notification sent to ' + subscription.endpoint);
+				activations.forEach((a) => log.info('Push notification for ' + a.symbol + ' quoting ' + a.price + ' at ' + new Date(a.activation) + ' sent to ' + subscription.endpoint));
 			})
 			.catch(function() {
-				console.log('ERROR in sending Notification, endpoint removed ' + subscription.endpoint);
-				delete webpushSubscriptions[subscription.endpoint];
+				activations.forEach((a) => log.error('ERROR in sending push notification for ' + a.symbol + ' quoting ' + a.price + ' at ' + new Date(a.activation) + ' to ' + subscription.endpoint));
+				delete subscriptions[subscription.endpoint];
+			});
+	});
+});
+
+app.get('/subscription/test', (req, res) => {
+	let payload = JSON.stringify({ title: name, message: 'Hello World!' });
+	Object.values(subscriptions).forEach((subscription) => {
+		webpush.sendNotification(subscription, payload)
+			.then(function() {
+				log.info('Test push notification sent to ' + subscription.endpoint);
+			})
+			.catch(function() {
+				log.error('ERROR in sending test push notification to old endpoint ' + subscription.endpoint);
+				delete subscriptions[subscription.endpoint];
 			});
 	});
 	res.send("");
@@ -90,18 +111,18 @@ app.get('/subscription/test', (req, res) => {
 
 app.post('/subscription/register', (req, res) => {
 	var subscription = req.body.subscription;
-	if (!webpushSubscriptions[subscription.endpoint]) {
+	if (!subscriptions[subscription.endpoint]) {
 		log.info('Subscription registered ' + subscription.endpoint);
-		webpushSubscriptions[subscription.endpoint] = subscription;
+		subscriptions[subscription.endpoint] = subscription;
 	}
 	res.sendStatus(201);
 })
 
 app.post('/subscription/unregister', (req, res) => {
 	var subscription = req.body.subscription;
-	if (webpushSubscriptions[subscription.endpoint]) {
+	if (subscriptions[subscription.endpoint]) {
 		log.info('Subscription unregistered ' + subscription.endpoint);
-		delete webpushSubscriptions[subscription.endpoint];
+		delete subscriptions[subscription.endpoint];
 	}
 	res.sendStatus(201);
 });
