@@ -2,33 +2,21 @@ const fs = require('fs')
 const http = require('http')
 const https = require('https')
 const express = require('express')
-const webpush = require('web-push');
+const webpush = require('web-push')
+const cmc = require('./coinmarketcap')
 const app = express()
 const name = 'Crypto!'
-const cmc = require('./coinmarketcap');
-
-if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
-	console.log("Missing VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.\nYou can use those:");
-	console.log(webpush.generateVAPIDKeys());
-	throw new Error("missing VAPID environment");
-}
-
-// Set the keys used for encrypting the push messages.
-webpush.setVapidDetails(
-	'https://serviceworke.rs/',
-	process.env.VAPID_PUBLIC_KEY,
-	process.env.VAPID_PRIVATE_KEY
-);
-
 const webpushSubscriptions = {}
 
 // This is the application configuration based on environment variables
 const config = {
 	dev: process.env.NODE_ENV === 'development', // 'production' or undefined otherwise
 	port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
-	key: process.env.HTTPS_KEY || '', // /path/to/privkey.pem
-	cert: process.env.HTTPS_CERT || '', // /path/to/cert.pem
+	httpsKey: process.env.HTTPS_KEY || '', // /path/to/privkey.pem
+	httpsCert: process.env.HTTPS_CERT || '', // /path/to/cert.pem
 	cmcAPIKey: process.env.CMC_API_KEY || '', // API key for CoinMarketCap https://coinmarketcap.com/api/features
+	vapidPublicKey: process.env.VAPID_PUBLIC_KEY,
+	vapidPrivateKey: process.env.VAPID_PRIVATE_KEY,
 }
 
 // This is a *very* simple log interface
@@ -38,6 +26,34 @@ const log = {
 	info: (text) => console.log(text),
 	trace: (text) => config.dev && console.log(text),
 }
+
+if (!config.dev && (!config.httpsKey || !config.httpsCert)) {
+	log.error("Missing HTTPS_KEY and HTTPS_CERT environment variables.");
+	process.exit(1);
+}
+
+if (!config.cmcAPIKey) {
+	log.error("Missing CMC_API_KEY environment variable.");
+	log.error("Go to https://coinmarketcap.com/api/features to get one.");
+	process.exit(2);
+}
+
+if (!config.vapidPublicKey || !config.vapidPrivateKey) {
+	let keyPair = webpush.generateVAPIDKeys();
+	log.error("Missing VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.");
+	log.error("You can use these newly generated keys:");
+	log.error("- VAPID_PUBLIC_KEY: " + keyPair.publicKey);
+	log.error("- VAPID_PRIVATE_KEY: " + keyPair.privateKey);
+	process.exit(3);
+} else {
+	// Set the keys used for encrypting the push messages.
+	webpush.setVapidDetails(
+		'https://serviceworke.rs/',
+		config.vapidPublicKey,
+		config.vapidPrivateKey
+	);
+}
+
 cmc.onerror = log.error;
 
 // Starting
@@ -52,7 +68,7 @@ app.use(express.json())
 // Redirect / to the main page
 app.get('/', (_req, res) => res.redirect('/index.html'));
 
-// Web-push Subscription management
+// Web-push subscription management
 app.get('/subscription/key', (req, res) => {
 	res.send(process.env.VAPID_PUBLIC_KEY);
 })
@@ -90,21 +106,13 @@ app.post('/subscription/unregister', (req, res) => {
 	res.sendStatus(201);
 });
 
-// Temporary routes to test CoinMarketCap access
-if (config.dev) {
-	app.get('/cmc/map', (req, res) => cmc.map(config.cmcAPIKey).then((data) => res.json(data)))
-	app.get('/cmc/info', (req, res) => cmc.info(config.cmcAPIKey, 'BTC,ETH,USDT').then((data) => res.json(data)))
-	app.get('/cmc/listing', (req, res) => cmc.listing(config.cmcAPIKey, 'USD').then((data) => res.json(data)))
-	app.get('/cmc/quotation', (req, res) => cmc.quotation(config.cmcAPIKey, 'BTC,ETH,USDT', 'USD').then((data) => res.json(data)))
-}
-
 // Create HTTP or HTTPS server, instead of app.listen
 // app.listen(config.port, () => { ... })
 var server;
-if (config.cert) {
+if (config.httpsCert) {
 	server = https.createServer({
-		key: fs.readFileSync(config.key),
-		cert: fs.readFileSync(config.cert)
+		key: fs.readFileSync(config.httpsKey),
+		cert: fs.readFileSync(config.httpsCert)
 	}, app);
 } else {
 	server = http.createServer(app);
