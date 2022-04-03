@@ -1,4 +1,4 @@
-const version = 5;
+const version = 6;
 const cacheName = 'crypto-alerts-' + version;
 const cacheContent = [
 	'/',
@@ -16,7 +16,38 @@ function trace(text) {
 	// console.log(`Service Worker : ${text}`);
 }
 
-/* Start the service worker and cache all of the app's content */
+// get ressource from server but fail if response is not fast enough
+function fromNetworkWithTimeout(request, timeout) {
+	return new Promise(function(resolve, reject) {
+		// Reject in case of timeout.
+		var timeoutId = setTimeout(() => {
+			timeoutId = null;
+			reject('timeout');
+		}, timeout);
+		fetch(request).then((response) => {
+			// Fulfill in case of success (and if timeout has not occurred yet)
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+				resolve(response);
+			}
+		}, () => {
+			// Reject if network fetch fails (and if timeout has not occurred yet)
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+				reject('network-failure');
+			}
+		});
+	});
+}
+
+// get ressource from cache and fail if no matching cache is found
+function fromCache(request) {
+	return caches.open(cacheName)
+		.then((cache) => cache.match(request))
+		.then((matching) => matching || Promise.reject('no-match'));
+}
+
+// auto-activate & create new cache as soon as the SW is installed
 self.addEventListener('install', (e) => {
 	info('installed');
 	self.skipWaiting();
@@ -26,7 +57,7 @@ self.addEventListener('install', (e) => {
 	);
 });
 
-/* Clean any previous cache */
+// delete old caches and claim clients as soon as the SW is activated
 self.addEventListener('activate', (e) => {
 	info('activated');
 	e.waitUntil(caches.keys()
@@ -38,13 +69,12 @@ self.addEventListener('activate', (e) => {
 	);
 });
 
-/* Serve cached content when available */
+// serve content from server first, or from cache if too long, or fail
 self.addEventListener('fetch', (e) => {
-	// TODO use 'network-or-cache' strategy instead ?
-	// https://github.com/mdn/serviceworker-cookbook/blob/master/strategy-network-or-cache/service-worker.js
 	trace('fetching ' + e.request.url);
-	e.respondWith(caches.match(e.request)
-		.then((response) => response || fetch(e.request))
+	// https://github.com/mdn/serviceworker-cookbook/blob/master/strategy-network-or-cache/service-worker.js
+	e.respondWith(fromNetworkWithTimeout(e.request, 400)
+		.catch(() => fromCache(e.request))
 	);
 });
 
@@ -71,17 +101,19 @@ self.addEventListener('push', function(event) {
 	let payload = event.data.json();
 	let title = payload.title;
 	let symbol = payload.activation.symbol;
-	let price = payload.activation.price;
+	let price = payload.activation.price.toFixed(5);
 	let time = new Date(payload.activation.activation).toLocaleTimeString();
 	let message = `${symbol} à ${price} USDT depuis ${time}`;
-	event.waitUntil(notifyUntilClicked(title, message).then(() => {
-		return self.clients.matchAll().then(function(clients) {
-			clients.forEach((c) => c.postMessage({
+	event.waitUntil(notifyUntilClicked(title, message)
+		.then(() => self.clients.matchAll())
+		.then((clients) => {
+			let message = {
 				type: 'push',
 				activation: payload.activation
-			}));
-		});
-	}));
+			};
+			clients.forEach((c) => c.postMessage(message));
+		})
+	);
 });
 
 let notifyTimeout = null;
