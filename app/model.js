@@ -29,7 +29,7 @@ class CryptoEntry {
 class CryptoAlert {
 
 	constructor(data) {
-		this.uuid = crypto.randomUUID(); // unique alert identifier
+		this.uuid = data.uuid || crypto.randomUUID(); // unique alert identifier
 		this.copy(data);
 		this.activation = undefined; // updated if alert gets activated
 	}

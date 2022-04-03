@@ -159,10 +159,87 @@ app.post('/subscription/unregister', (req, res) => {
 	res.sendStatus(201);
 })
 
-app.get('/subscription/test', (req, res) => {
-	model.addAlert({ symbol: 'BTC', operator: 'higher', threshold: 43000 });
-	res.send("");
-})
+app.get('/cryptos.json', (req, res) => model.listEntries().then((entries) => res.json(entries)));
+
+app.post('/alert/add', (req, res) => {
+	// Extract only the needed properties from body
+	let { symbol, operator, threshold, expiration, vibration, notification } = req.body;
+	// Check request
+	if (typeof symbol !== 'string' || typeof operator !== 'string'
+		|| typeof threshold !== 'number' || typeof vibration !== 'boolean' || typeof notification !== 'boolean'
+		|| (typeof expiration !== 'undefined' && typeof expiration !== 'number')) {
+		return res.sendStatus(400);
+	}
+	// Update model
+	return model.addAlert({ symbol, operator, threshold, expiration, vibration, notification })
+		.then((uuid) => {
+			// Trace operation
+			log.info(`Add alert ${uuid} on ${symbol} at ${threshold}`);
+			// Save data, including alerts
+			saveData();
+			// Send 'uuid' in response to allow further update
+			return res.send(uuid);
+		});
+});
+
+app.post('/alert/update', (req, res) => {
+	// Extract only the needed properties from body
+	let { uuid, symbol, operator, threshold, expiration, vibration, notification } = req.body;
+	// Check request
+	if (typeof uuid !== 'string' || typeof symbol !== 'string' || typeof operator !== 'string'
+		|| typeof threshold !== 'number' || typeof vibration !== 'boolean' || typeof notification !== 'boolean'
+		|| (typeof expiration !== 'undefined' && typeof expiration !== 'number')) {
+		return res.sendStatus(400);
+	}
+	// Trace operation
+	log.info(`Update alert ${uuid} on ${symbol} at ${threshold}`)
+	// Update model
+	return model.updateAlert({ uuid, symbol, operator, threshold, expiration, vibration, notification })
+		// Send OK
+		.then(() => res.send(""))
+		// Save data, including alerts
+		.then(() => saveData())
+		// or 404 when uuid does not match an existing alert
+		.catch(() => res.sendStatus(404));
+});
+
+app.post('/alert/delete', (req, res) => {
+	// Extract content from body
+	let uuids = req.body;
+	if (typeof uuids === 'string')
+		uuids = [uuids];
+	// Check request
+	if (!Array.isArray(uuids) || uuids.find((e) => typeof e !== 'string'))
+		return res.sendStatus(400);
+	// Trace operation
+	log.info(`Delete alerts ${uuids}`)
+	// Update model
+	return model.deleteAlerts(uuids)
+		// Send OK
+		.then(() => res.send(""))
+		// Save data, including alerts
+		.then(() => saveData())
+		// or 404 when one uuid in uuids does not match an existing alert
+		.catch(() => res.sendStatus(404));
+});
+
+app.get('/alert/list', (req, res) => {
+	// Extract content from body
+	let uuids = req.query.uuids;
+	if (typeof uuids === 'string')
+		uuids = [uuids];
+	// Check request
+	if (!Array.isArray(uuids) || uuids.find((e) => typeof e !== 'string'))
+		return res.sendStatus(400);
+	// Trace operation
+	log.info(`List alerts ${uuids}`)
+	// Get model
+	return model.listAlerts(uuids)
+		// Send alert as asked for
+		.then((alerts) => res.json(alerts))
+		// or 404 when one uuid in uuids does not match an existing alert
+		.catch(() => res.sendStatus(404));
+});
 
 model.listEntries()
 	.then(() => loadData())

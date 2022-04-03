@@ -2,3 +2,5 @@
 /node_modules/
 # Generated file
 /package-lock.json
+# Persistent database
+database.json
