@@ -4,8 +4,8 @@ const http = require('http')
 const https = require('https')
 const express = require('express')
 const webpush = require('web-push')
-//const CryptoSource = require('./app/source-cmc')
-const CryptoSource = require('./app/source-test')
+const CryptoSource = require('./app/source-cmc')
+// const CryptoSource = require('./app/source-test')
 const CryptoModel = require('./app/model')
 
 // This is the application configuration based on environment variables
@@ -60,15 +60,14 @@ if (!config.vapidPublicKey || !config.vapidPrivateKey) {
 
 const app = express()
 const name = 'Crypto!'
+const filename = 'database.json';
 const subscriptions = {}
-const source = new CryptoSource(config.cmcAPIKey, 'USDT', log.error);
+const source = new CryptoSource(config.cmcAPIKey, 'USDT');
 const model = new CryptoModel(source);
 
 function loadData() {
-	// https://nodejs.org/dist/latest-v16.x/docs/api/fs.html#fspromisesreadfilepath-options
-	let filename = 'database.json';
 	if (!fs.existsSync(filename)) {
-		log.info(`Database file '${filename}' does not exist.`);
+		log.info(`No database file '${filename}' yet.`);
 		return Promise.resolve();
 	}
 	return fsPromises.readFile(filename, { encoding: 'utf8' })
@@ -86,15 +85,11 @@ function loadData() {
 }
 
 function saveData() {
-	// https://nodejs.org/dist/latest-v16.x/docs/api/fs.html#fspromiseswritefilefile-data-options
-	let filename = 'database.json';
-	let data = {
-		subscriptions: Object.values(subscriptions),
-		alerts: model.alerts
-	};
-	return fsPromises.writeFile(filename, JSON.stringify(data), { encoding: 'utf8' })
-		.then(() => {
-			log.info(`Saved ${data.alerts.length} alert(s) and ${data.subscriptions.length} subscription(s) to '${filename}'`);
+	return model.listAlerts()
+		.then((alerts) => {
+			let data = { alerts, subscriptions: Object.values(subscriptions) };
+			log.trace(`Saving ${data.alerts.length} alert(s) and ${data.subscriptions.length} subscription(s) to '${filename}'`);
+			return fsPromises.writeFile(filename, JSON.stringify(data), { encoding: 'utf8' });
 		})
 		.catch((err) => {
 			log.error(`Error saving data to '${filename}': ${err}`);
@@ -130,7 +125,7 @@ app.get('/', (_req, res) => res.redirect('/index.html'));
 
 // Web-push subscription management
 app.get('/subscription/key', (req, res) => {
-	res.send(process.env.VAPID_PUBLIC_KEY);
+	res.type('text/plain').send(process.env.VAPID_PUBLIC_KEY);
 })
 
 app.post('/subscription/register', (req, res) => {
@@ -159,7 +154,22 @@ app.post('/subscription/unregister', (req, res) => {
 	res.sendStatus(201);
 })
 
-app.get('/cryptos.json', (req, res) => model.listEntries().then((entries) => res.json(entries)));
+app.get('/cryptos.json', (req, res) => {
+	// Get/Update the crypto list
+	return model.listEntries()
+		.then((entries) => {
+			// Trace
+			log.info(`Found ${entries.length} cryptos assets`);
+			// Send crypto list as JSON
+			res.json(entries)
+		})
+		.catch((error) => {
+			// Trace
+			log.error(`Error updating the crypto asset list : ${error}`);
+			// Send crypto list as JSON
+			res.json([])
+		});
+});
 
 app.post('/alert/add', (req, res) => {
 	// Extract only the needed properties from body
@@ -178,7 +188,7 @@ app.post('/alert/add', (req, res) => {
 			// Save data, including alerts
 			saveData();
 			// Send 'uuid' in response to allow further update
-			return res.send(uuid);
+			return res.type('text/plain').send(uuid);
 		});
 });
 
@@ -196,7 +206,7 @@ app.post('/alert/update', (req, res) => {
 	// Update model
 	return model.updateAlert({ uuid, symbol, operator, threshold, expiration, vibration, notification })
 		// Send OK
-		.then(() => res.send(""))
+		.then(() => res.type('text/plain').send(""))
 		// Save data, including alerts
 		.then(() => saveData())
 		// or 404 when uuid does not match an existing alert
@@ -216,7 +226,7 @@ app.post('/alert/delete', (req, res) => {
 	// Update model
 	return model.deleteAlerts(uuids)
 		// Send OK
-		.then(() => res.send(""))
+		.then(() => res.type('text/plain').send(""))
 		// Save data, including alerts
 		.then(() => saveData())
 		// or 404 when one uuid in uuids does not match an existing alert
@@ -224,26 +234,23 @@ app.post('/alert/delete', (req, res) => {
 });
 
 app.get('/alert/list', (req, res) => {
-	// Extract content from body
-	let uuids = req.query.uuids;
-	if (typeof uuids === 'string')
-		uuids = [uuids];
-	// Check request
-	if (!Array.isArray(uuids) || uuids.find((e) => typeof e !== 'string'))
-		return res.sendStatus(400);
 	// Trace operation
-	log.info(`List alerts ${uuids}`)
+	log.trace('List alerts')
 	// Get model
-	return model.listAlerts(uuids)
+	return model.listAlerts()
 		// Send alert as asked for
 		.then((alerts) => res.json(alerts))
 		// or 404 when one uuid in uuids does not match an existing alert
 		.catch(() => res.sendStatus(404));
 });
 
-model.listEntries()
-	.then(() => loadData())
-	.then(() => model.quoteEntries(sendNotification));
+model.listEntries() // load crypto list from source
+	.then(() => loadData()) // load save data
+	.then(() => model.quoteEntries(sendNotification, log.error)) // start quote loop
+	.catch((error) => { // If an error occured, log and exit application
+		log.error(`${name} could not start because on error occurred : ${error}`);
+		process.exit(4);
+	});
 
 // Create HTTP or HTTPS server, instead of app.listen
 // app.listen(config.port, () => { ... })

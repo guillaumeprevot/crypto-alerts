@@ -1,6 +1,6 @@
 /** This class is used to get test data to avoid CoinMarketCap calls during dev */
 class TestSource {
-	constructor(_apiKey, quotationSymbol, _onerror) {
+	constructor(_apiKey, quotationSymbol) {
 		this.name = 'test';
 		this.title = 'Test data';
 		this.quotationSymbol = quotationSymbol;

@@ -67,10 +67,10 @@ class CryptoModel {
 		});
 	}
 
-	quoteEntries(onactivation) {
+	quoteEntries(onactivation, onerror) {
 		if (this.alerts.length === 0) {
 			// Quoting is unnecessary, try again later
-			this.quoteTimeout = setTimeout(() => this.quoteEntries(onactivation), this.source.quoteInterval);
+			this.quoteTimeout = setTimeout(() => this.quoteEntries(onactivation, onerror), this.source.quoteInterval);
 			return;
 		}
 		// get the symbols from configured alerts
@@ -117,8 +117,8 @@ class CryptoModel {
 				}
 			});
 			// Wait before the next quoting
-			this.quoteTimeout = setTimeout(() => this.quoteEntries(onactivation), this.source.quoteInterval);
-		});
+			this.quoteTimeout = setTimeout(() => this.quoteEntries(onactivation, onerror), this.source.quoteInterval);
+		}).catch(onerror);
 	}
 
 	addAlert(alert) {
@@ -143,11 +143,8 @@ class CryptoModel {
 		return Promise.resolve();
 	}
 
-	listAlerts(uuids) {
-		let results = this.alerts.filter((a) => uuids.includes(a.uuid));
-		if (results.length !== uuids.length)
-			return Promise.reject();
-		return Promise.resolve(results);
+	listAlerts() {
+		return Promise.resolve(this.alerts);
 	}
 
 }

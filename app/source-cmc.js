@@ -3,14 +3,14 @@ const https = require('https')
 /** This class is used to extract data from CoinMarketCap */
 class CoinMarketCapSource {
 
-	constructor(apiKey, quotationSymbol, onerror) {
+	constructor(apiKey, quotationSymbol) {
 		this.name = 'cmc';
 		this.title = 'CoinMarketCap';
 		this.apiKey = apiKey;
 		this.quotationSymbol = quotationSymbol;
-		this.onerror = onerror || ((error) => console.log(error));
-		this.listInterval = 24 * 60 * 60 * 1000; // Update crypto list once a day
-		this.quoteInterval = 60 * 1000; // Update crypto quote each minute
+		// CoinMarketCap limits to 10 000 calls per month (https://coinmarketcap.com/api/pricing/)
+		this.listInterval = 24 * 60 * 60 * 1000; // Update crypto list once a day (31 calls per month)
+		this.quoteInterval = 5 * 60 * 1000; // Update crypto quote every 5 minutes (8928 calls par month)
 	}
 
 	// Wrapper of "https.request" to extract JSON from CoinMarkerCap
@@ -41,10 +41,7 @@ class CoinMarketCapSource {
 					resolve(result);
 				})
 			});
-			req.on('error', (error) => {
-				this.onerror(error);
-				reject(error);
-			});
+			req.on('error', reject);
 			req.end();
 		});
 	}
@@ -72,7 +69,7 @@ class CoinMarketCapSource {
 	// For the background retrieving of latest quotes
 	// https://coinmarketcap.com/api/documentation/v1/#operation/getV2CryptocurrencyQuotesLatest
 	quote(symbols) {
-		return this.json(this.apiKey, '/v2/cryptocurrency/quotes/latest', {
+		return this.json('/v2/cryptocurrency/quotes/latest', {
 			symbol: symbols.join(','),
 			convert: this.quotationSymbol,
 			aux: ''
@@ -83,6 +80,7 @@ class CoinMarketCapSource {
 				let price = cc.quote[this.quotationSymbol].price;
 				map.set(symbol, price);
 			});
+			console.log(map);
 			return map;
 		});
 	}
