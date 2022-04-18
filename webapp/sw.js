@@ -1,11 +1,15 @@
-const version = 6;
+const version = 7;
 const cacheName = 'crypto-alerts-' + version;
 const cacheContent = [
 	'/',
 	'/index.html',
 	'/app.js',
 	'/style.css',
-	'/favicon.ico'
+	'/favicon.ico',
+	'https://code.jquery.com/jquery-3.6.0.min.js',
+	'https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js',
+	'https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css',
+	'https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js'
 ];
 
 function info(text) {
@@ -78,25 +82,6 @@ self.addEventListener('fetch', (e) => {
 	);
 });
 
-self.addEventListener('message', (e) => {
-	if (e.data === 'notify') {
-		self.registration.showNotification('Notify from SW', {
-			body: 'Buzz! Buzz!',
-			icon: '/icons/icon-192.png',
-			vibrate: [200, 100, 200, 100, 200, 100, 200],
-			tag: 'vibration-sample'
-		});
-	}
-});
-
-self.addEventListener('notificationclick', (e) => {
-	self.clients.matchAll().then(function(clients) {
-		clients.forEach((c) => c.postMessage('notificationclick'));
-	});
-});
-
-//======= PUSH NOTIFICATIONS =======
-
 self.addEventListener('push', function(event) {
 	let payload = event.data.json();
 	let title = payload.title;
@@ -139,20 +124,27 @@ self.addEventListener('notificationclick', (e) => {
 });
 
 self.addEventListener('pushsubscriptionchange', function(event) {
-	info('subscription expired');
-	event.waitUntil(
-		self.registration.pushManager.subscribe({ userVisibleOnly: true })
-		.then(function(subscription) {
-			info('subscription renewed');
-			return fetch('/subscription/register', {
-				method: 'post',
-				headers: {
-					'Content-type': 'application/json'
-				},
-				body: JSON.stringify({
-					subscription: subscription
-				})
-			});
+	// https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/pushsubscriptionchange_event
+	// Firefox does not support "event.oldSubscription", hence the first "fetch" to retrieve the key
+	// Event is not easy to test and old methods (like block and allow notifications) does not work either
+	info('subscription changed');
+	event.waitUntil(async function () {
+		// Get the server's public key
+		const response = await fetch('/subscription/key');
+		const vapidPublicKey = await response.text();
+		const subscription = await self.registration.pushManager.subscribe({
+			userVisibleOnly: true,
+			applicationServerKey: vapidPublicKey
+		});
+		info('subscription renewed');
+		return fetch('/subscription/register', {
+			method: 'post',
+			headers: {
+				'Content-type': 'application/json'
+			},
+			body: JSON.stringify({
+				subscription: subscription
+			})
 		})
-	);
+	});
 });

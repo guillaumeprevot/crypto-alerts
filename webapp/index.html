@@ -7,6 +7,7 @@
 		<link rel="stylesheet" href="style.css">
 		<link rel="icon" type="image/x-icon" href="favicon.ico">
 		<link rel="apple-touch-icon" href="icons/icon-152-apple.png">
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta name="theme-color" content="#f79413"/>
 		<meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,21 +18,130 @@
 		<script src="app.js" defer></script>
 	</head>
 	<body>
-		<h3>Crypto Alerts</h3>
-		<button class="install-button">Install PWA</button>
-		<p><b>Vibration</b></p>
-		<button class="vibrate vibrate-single">Test single vibration</button>
-		<button class="vibrate vibrate-pattern">Test pattern vibration</button>
-		<button class="vibrate vibrate-off">Test stop vibration</button>
-		<p><b>Notification</b></p>
-		<button class="notify-permission">Request permission</button>
-		<button class="notify-client">Notify from HTML</button>
-		<button class="notify-sw">Notify from SW</button>
-		<span class="notify-clicked">Notification has been clicked</span>
-		<p><b>Push notification</b></p>
-		<button id="push-register">Subscribe</button>
-		<button id="push-unregister">Unsubscribe</button>
-		<button id="push-test">Test</button>
-		<ul id="push-alerts"></ul>
+		<div class="d-none">
+			<svg id="add-icon" viewBox="0 0 16 16">
+				<path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+				<path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+			</svg>
+			<svg id="delete-icon" viewBox="0 0 16 16">
+				<path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+				<path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+			</svg>
+		</div>
+
+		<div class="container mt-2">
+			<div id="install-button" class="alert alert-primary" role="alert">
+				Etape 1 : <a href="#" class="alert-link">cliquez&nbsp;ici</a> pour installer cette application
+			</div>
+
+			<div id="subscribe-button" class="alert alert-primary" role="alert">
+				Etape 2 : <a href="#" class="alert-link">cliquez&nbsp;ici</a> pour autoriser les notifications
+			</div>
+	
+			<div id="unsubscribe-button" class="alert alert-danger" role="alert">
+				Pour test : <a href="#" class="alert-link">cliquez&nbsp;ici</a> pour vous désabonner des notifications
+			</div>
+
+			<div id="start-button" class="alert alert-primary" role="alert">
+				Etape 3 : <a href="#" class="alert-link">cliquez&nbsp;ici</a> pour créer votre première alerte
+			</div>
+	
+			<ul id="alert-list" class="list-group">
+				<li class="list-group-item list-group-item-secondary">
+					<div style="display: flex; flex-direction: row; align-items: center;">
+						<span style="flex: auto;">Alertes actuelles</span>
+						<span style="flex: none;">
+							<button id="add-button" type="button" class="btn btn-link" title="Ajouter une alerte">
+								<svg class="bi" width="20" height="20" fill="currentColor"><use xlink:href="#add-icon"/></svg>
+							</button>
+							<button id="clear-button" type="button" class="btn btn-link text-danger" title="Vider toutes les alertes">
+								<svg class="bi" width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><use xlink:href="#delete-icon"/></svg>
+							</button>
+						</span>
+					</div>
+				</li>
+			</ul>
+		</div>
+
+		<div id="alert-modal" class="modal" tabindex="-1">
+			<div class="modal-dialog modal-dialog-scrollable">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title">Paramétrer l'alerte</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer" title="Fermer"></button>
+					</div>
+					<div class="modal-body">
+						<form>
+							<div class="row mb-3">
+								<label for="crypto-input" class="col-form-label col-md-4">Condition</label>
+								<div class="col-md-8">
+									<input type="text" class="form-control" id="crypto-input" placeholder="Recherche...">
+									<ul id="crypto-list" class="list-group"></ul>
+								</div>
+							</div>
+							<div class="row mb-3">
+								<div class="col-md-4"></div>
+								<div class="col-md-8">
+									<select id="operator-select" class="form-select">
+										<option value="higher">passe au-dessus de</option>
+										<option value="lower">passe en-dessous de</option>
+										<option value="cross">croise</option>
+									</select>
+								</div>
+							</div>
+							<div class="row mb-3">
+								<div class="col-md-4"></div>
+								<div class="col-md-8">
+									<input type="number" step="0.0001" class="form-control" id="threshold-input" placeholder="seuil" required>
+								</div>
+							</div>
+							<div class="row mb-3">
+								<label for="expiration-input" class="col-form-label col-md-4">Expiration</label>
+								<div class="col-md-8">
+									<input type="datetime-local" class="form-control" id="expiration-input">
+								</div>
+							</div>
+							<div class="row mb-3 d-none">
+								<label class="col-form-label col-md-4">Actions</label>
+								<div class="col-md-8">
+									<div class="form-check form-switch">
+										<input class="form-check-input" type="checkbox" role="switch" id="notification-checkbox">
+										<label class="form-check-label" for="notification-checkbox">Notification</label>
+									</div>
+									<div class="form-check form-switch">
+										<input class="form-check-input" type="checkbox" role="switch" id="vibration-checkbox">
+										<label class="form-check-label" for="vibration-checkbox">Vibration</label>
+									</div>
+								</div>
+							</div>
+						</form>
+					</div>
+					<div class="modal-footer">
+						<button id="alert-delete-button" type="button" class="btn btn-outline-danger">Effacer</button>
+						<span class="flex-grow-1"></span>
+						<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+						<button id="alert-validate-button" type="button" class="btn btn-outline-primary">Sauvegarder</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div id="clear-confirm-modal" class="modal" tabindex="-1">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-body">
+						<p class="text-danger">Ceci supprimera TOUTES les alertes existantes. Etes-vous sûr ?</p>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+						<button id="clear-confirm-button" type="button" class="btn btn-outline-danger">TOUT supprimer</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+		<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js" integrity="sha384-7+zCNj/IqJ95wo16oMtfsKbZ9ccEh31eOz1HGyDuCQ6wgnyJNSYdrPa03rtR1zdB" crossorigin="anonymous"></script>
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js" integrity="sha384-QJHtvGhmr9XOIpI6YVutG+2QOK9T+ZnN4kzFN1RtK3zEFEIsxhlmWl5/YESvpZ13" crossorigin="anonymous"></script>
 	</body>
 </html>
